@@ -1,68 +1,133 @@
-
 import pygame
+import pygame.mixer
 
+# Initialize pygame and mixer modules
 pygame.init()
+pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=4096)
+
+# Initialize clock and game window dimensions
 clock = pygame.time.Clock()
-WINDOW_WIDTH = 800
+WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 500
+
+# Define colors and fonts
 WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)  # Add this line
+
+# Initialize fonts and create game window
 pygame.font.init()
-textfont = pygame.font.SysFont("monospace", 30)
+textfont = pygame.font.SysFont("arial", 30)
+button_font = pygame.font.SysFont("arial", 20)
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-pygame.display.set_caption("PI")
-screen.fill((0,0,0))
-s1 = pygame.Surface((60,60))
-s1.fill((255,0,0))
+pygame.display.set_caption("Collision Simulation")
+screen.fill((0, 0, 0))
+
+# Create a red square surface and set its transparency
+s1 = pygame.Surface((60, 60))
+s1.fill((255, 0, 0))
 s1.set_alpha(255)
 
+# Define Object class to represent simulation objects
 class Object():
-    def __init__(self, mass, velocity,surface,pos):
+    def __init__(self, mass, velocity, surface, pos):
         self.mass = mass
         self.velocity = velocity
         self.surface = surface
         self.pos = pos
 
+# Load collision sound
+collision_sound = pygame.mixer.Sound("collision_sound.wav")
+
+# Initialize simulation parameters and objects
 collisions = 0
 mass1 = 1000000
 s = pygame.Surface((300, 300))
 s.fill((0, 0, 255))
-m1 = Object(mass1,-50,s,390)
-m2 = Object(1,0,s1,300)
-wall = pygame.Rect(35,500,5,300)
+m1 = Object(mass1, -50, s, 390)
+m2 = Object(1, 0, s1, 300)
+wall = pygame.Rect(35, 500, 5, 300)
 
-pygame.draw.line(screen,WHITE,(40,500),(40,0),5) #zid vert
-pygame.draw.line(screen,WHITE,(800,450),(0,450),2)
+# Draw vertical and horizontal walls
+pygame.draw.line(screen, WHITE, (40, 500), (40, 0), 5)  # vertical wall
+pygame.draw.line(screen, WHITE, (1200, 450), (0, 450), 2)  # horizontal wall
+
+# Set time step and simulation speed
 time_step = 1000
 fps = 1000
+simulation_speed = 1  # Default simulation speed
 
+# Define dimensions and properties of the "Fast Forward" button
+fast_forward_button_rect = pygame.Rect(1000, 20, 100, 40)
+
+# Enter the main simulation loop
 while True:
+    # Limit the frame rate using the clock
     clock.tick(fps)
-    dt1, dt2 = clock.tick(fps) / 1000 , clock.tick(time_step) / 1000
+    
+    # Calculate time steps for the simulation
+    dt1, dt2 = clock.tick(fps) / 1000, clock.tick(time_step) / 1000
     dt = dt1 * dt2
-    r1 = pygame.Rect(m1.pos,450,60,60)
-    r2 = pygame.Rect(m2.pos,450,60,60)
+    
+    # Create rectangles to detect collisions
+    r1 = pygame.Rect(m1.pos, 450, 60, 60)
+    r2 = pygame.Rect(m2.pos, 450, 60, 60)
+    
+    # Simulate the movement and collisions
     for i in range(time_step):
-        m1.pos += m1.velocity * dt
-        m2.pos += m2.velocity * dt
+        m1.pos += m1.velocity * dt * simulation_speed
+        m2.pos += m2.velocity * dt * simulation_speed
+        
+        # Detect and handle collisions
         if m1.pos <= m2.pos + 60:
+            # Update velocities based on collision physics
+            old_vel, old_vel2 = m1.velocity, m2.velocity
+            m1.velocity = (m1.mass - m2.mass) / (m1.mass + m2.mass) * old_vel + (2 * m2.mass) / (m1.mass + m2.mass) * m2.velocity
+            m2.velocity = (2 * m1.mass) / (m1.mass + m2.mass) * old_vel + (m2.mass - m1.mass) / (m1.mass + m2.mass) * old_vel2
             collisions += 1
-            old_vel, old_vel2= m1.velocity, m2.velocity
-            m1.velocity = (m1.mass - m2.mass) / (m1.mass + m2.mass) * old_vel + (2 * m2.mass) / (
-                    m1.mass + m2.mass) * m2.velocity
-            m2.velocity = (2 * m1.mass) / (m1.mass + m2.mass) * old_vel + (m2.mass - m1.mass) / (
-                    m1.mass + m2.mass) * old_vel2
-        elif m2.pos <= 40 and m2.velocity < 0 :
+            collision_sound.play()  # Play collision sound
+        elif m2.pos <= 40 and m2.velocity < 0:
+            # Reverse velocity if cube hits left wall
             m2.velocity *= -1
-            collisions+=1
-    pygame.Surface.fill(screen, (0, 0, 0))
+            collisions += 1
+    
+    # Clear the screen and redraw walls
+    screen.fill((0, 0, 0))
     pygame.draw.line(screen, WHITE, (40, 500), (40, 0), 5)  # vertical wall
-    pygame.draw.line(screen, WHITE, (800, 450), (0, 450), 2)
+    pygame.draw.line(screen, WHITE, (1200, 450), (0, 450), 2)  # horizontal wall
+    
+    # Handle pygame events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
-    screen.blit(m1.surface, (m1.pos,150))
-    screen.blit(m2.surface, (m2.pos,390))
-    textTBD = textfont.render("Colisions:"+ str(collisions), True, (255,0 ,0 ))
-    screen.blit(textTBD, (500,60))
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Toggle simulation speed on button press
+            simulation_speed = 3 if simulation_speed == 1 else 1
+    
+    # Draw simulation objects and other elements
+    screen.blit(m1.surface, (m1.pos, 150))
+    screen.blit(m2.surface, (m2.pos, 390))
+    
+    # Display cube masses, Fast Forward button, and collision count
+    cube1_mass_text = textfont.render(str(m1.mass), True, (255, 255, 255))
+    cube2_mass_text = textfont.render(str(m2.mass), True, (255, 255, 255))
+    cube1_text_x = m1.pos + (60 - cube1_mass_text.get_width()) / 2
+    cube1_text_y = 150 + (60 - cube1_mass_text.get_height()) / 2
+    cube2_text_x = m2.pos + (60 - cube2_mass_text.get_width()) / 2
+    cube2_text_y = 390 + (60 - cube2_mass_text.get_height()) / 2
+    screen.blit(cube1_mass_text, (cube1_text_x, cube1_text_y))
+    screen.blit(cube2_mass_text, (cube2_text_x, cube2_text_y))
+    
+    # Draw the Fast Forward button
+    pygame.draw.rect(screen, GREEN if simulation_speed == 3 else BLACK, fast_forward_button_rect)
+    button_text = button_font.render("Fast Forward", True, WHITE)
+    button_text_x = 1000 + (100 - button_text.get_width()) / 2
+    button_text_y = 20 + (40 - button_text.get_height()) / 2
+    screen.blit(button_text, (button_text_x, button_text_y))
+    
+    textTBD = textfont.render("Collisions: " + str(collisions), True, (255, 0, 0))
+    screen.blit(textTBD, (500, 60))
+    
+    # Update the display
     pygame.display.flip()
-
